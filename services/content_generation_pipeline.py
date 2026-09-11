@@ -1,60 +1,44 @@
-import os
-from pathlib import Path
+from functools import lru_cache
 
-from dotenv import load_dotenv
 from google import genai
 
+from config import GEMINI_MODEL, LLM_TEMPERATURE, require_gemini_key
+from services.prompt_loader import load_prompt
 from services.token_metrics import extract_token_metrics
 
 
-load_dotenv()
-
-
-api_key = os.getenv("GEMINI_API_KEY")
-MODEL = os.getenv("GENAI_MODEL", "gemini-3.6-flash")
-TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.1"))
-
-if not api_key:
-    raise ValueError("GEMINI_API_KEY is not configured")
-
-client = genai.Client(api_key=api_key)
+MAX_OUTPUT_TOKENS = 400
 
 
 # ==================================================
-# Prompt Loader
+# Native Gemini Client
 # ==================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+@lru_cache(maxsize=1)
+def get_client():
+    """Build the native google-genai client on first use, then reuse it.
 
+    This module previously raised ValueError at import time when the key
+    was missing. api/content_pipeline_ui.py imports it at module level, so
+    a missing key took down the whole UI with a bare traceback instead of
+    failing at the point the pipeline was actually called.
+    """
 
-def load_prompt(prompt_name):
-
-    prompt_file = PROJECT_ROOT / "prompts" / prompt_name
-
-    if not prompt_file.exists():
-        raise FileNotFoundError(
-            f"Prompt not found: {prompt_file}"
-        )
-
-    return prompt_file.read_text(
-        encoding="utf-8"
+    return genai.Client(
+        api_key=require_gemini_key()
     )
 
-
-# ==================================================
-# Token Metrics
-# ==================================================
 
 # ==================================================
 # Native Gemini Chat Helper
 # ==================================================
 
 def generate_text(prompt: str):
-    chat = client.chats.create(
-        model=MODEL,
+    chat = get_client().chats.create(
+        model=GEMINI_MODEL,
         config=genai.types.GenerateContentConfig(
-            temperature=TEMPERATURE,
-            max_output_tokens=400,
+            temperature=LLM_TEMPERATURE,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
         ),
     )
 
