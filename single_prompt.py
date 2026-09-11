@@ -1,22 +1,22 @@
-import os
 import sys
-from dotenv import load_dotenv
+
 from google import genai
 from google.genai import errors
 
+from config import GEMINI_MODEL, require_gemini_key
 from services.token_metrics import extract_token_metrics, format_token_metrics
 
-load_dotenv()  # Load environment variables from .env file
 
-
-
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    print("Error: GEMINI_API_KEY not found in environment variables.")
+# require_gemini_key raises so that library callers are not killed by a
+# sys.exit. This is a script, so catch it and exit cleanly.
+try:
+    api_key = require_gemini_key()
+except ValueError as exc:
+    print(f"Error: {exc}")
     sys.exit(1)
 
 client = genai.Client(api_key=api_key)
-MODEL = os.getenv("GENAI_MODEL", "gemini-3.6-flash")
+MODEL = GEMINI_MODEL
 
 print("Sending prompt: ")
 

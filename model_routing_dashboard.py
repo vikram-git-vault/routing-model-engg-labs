@@ -1,13 +1,12 @@
-import os
 import csv
 import random
 import sys
 import time
 
-from dotenv import load_dotenv
 from google import genai
 from google.genai import errors
 
+from config import GEMINI_MODEL, GENAI_TIMEOUT_MS, require_gemini_key
 from services.token_metrics import extract_token_metrics, format_token_metrics
 
 
@@ -15,17 +14,16 @@ from services.token_metrics import extract_token_metrics, format_token_metrics
 # 1. Configuration
 # ============================================================
 
-load_dotenv()
-
-api_key = os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    print("Error: GEMINI_API_KEY not found in environment variables.")
+try:
+    api_key = require_gemini_key()
+except ValueError as exc:
+    print(f"Error: {exc}")
     sys.exit(1)
 
 
-MODEL = os.getenv("GENAI_MODEL", "gemini-3.6-flash")
-REQUEST_TIMEOUT_MS = int(os.getenv("GENAI_TIMEOUT_MS", "30000"))
+MODEL = GEMINI_MODEL
+# Milliseconds - this is the native google.genai client, not LangChain.
+REQUEST_TIMEOUT_MS = GENAI_TIMEOUT_MS
 
 client = genai.Client(
     api_key=api_key,

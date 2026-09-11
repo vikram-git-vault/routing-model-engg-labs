@@ -72,6 +72,23 @@ GENAI_TIMEOUT_MS = int(
 )
 
 
+# Per-attempt deadline for the LangChain chat models, in SECONDS.
+#
+# The Gemini API rejects any deadline below 10s outright:
+#   400 INVALID_ARGUMENT "Manually set deadline 1s is too short.
+#                         Minimum allowed deadline is 10s."
+# so lower values are clamped rather than sent and refused.
+#
+# This covers ONE attempt. It does not cover backoff between retries, so
+# total wall time can still exceed it - see services/tiered_task_executor.
+MIN_TIMEOUT_SECONDS = 10
+
+LLM_TIMEOUT_SECONDS = max(
+    MIN_TIMEOUT_SECONDS,
+    float(os.getenv("LLM_TIMEOUT_SECONDS", "20")),
+)
+
+
 def require_gemini_key() -> str:
     """Return the Gemini key, or raise with a message that says what to do.
 

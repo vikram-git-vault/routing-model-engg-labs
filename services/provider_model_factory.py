@@ -1,12 +1,11 @@
-import os
-
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from config import (
     GEMINI_API_KEY,
     ANTHROPIC_API_KEY,
-    LLM_TEMPERATURE
+    LLM_TEMPERATURE,
+    LLM_TIMEOUT_SECONDS,
 )
 from services.warning_policy import suppress_langchain_google_warnings
 
@@ -14,20 +13,10 @@ from services.warning_policy import suppress_langchain_google_warnings
 suppress_langchain_google_warnings()
 
 
-# Seconds, not milliseconds. Both LangChain chat models below expect seconds
-# and convert to ms internally. This differs from google.genai HttpOptions,
-# which takes milliseconds - see model_routing_dashboard.py.
-#
-# The Gemini API rejects any deadline below 10s outright:
-#   400 INVALID_ARGUMENT "Manually set deadline 1s is too short.
-#                         Minimum allowed deadline is 10s."
-# so anything lower is clamped rather than sent and refused.
-MIN_TIMEOUT_SECONDS = 10
-
-REQUEST_TIMEOUT_SECONDS = max(
-    MIN_TIMEOUT_SECONDS,
-    float(os.getenv("LLM_TIMEOUT_SECONDS", "20")),
-)
+# Seconds, not milliseconds. Both chat models below expect seconds and
+# convert to ms internally. config.LLM_TIMEOUT_SECONDS owns the value and
+# the 10-second API floor.
+REQUEST_TIMEOUT_SECONDS = LLM_TIMEOUT_SECONDS
 
 
 def get_llm(

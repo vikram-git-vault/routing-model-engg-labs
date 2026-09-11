@@ -1,24 +1,21 @@
 import json
-import os
 import re
 import sys
 
-from dotenv import load_dotenv
 from google import genai
 from google.genai import errors
 
+from config import GEMINI_MODEL, require_gemini_key
 from services.token_metrics import extract_token_metrics, format_token_metrics
 
 # --------------------------------------------------
-# 1. Load environment variables
+# 1. Configuration
 # --------------------------------------------------
 
-load_dotenv()
-
-api_key = os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    print("Error: GEMINI_API_KEY not found in environment variables.")
+try:
+    api_key = require_gemini_key()
+except ValueError as exc:
+    print(f"Error: {exc}")
     sys.exit(1)
 
 # --------------------------------------------------
@@ -27,7 +24,7 @@ if not api_key:
 
 client = genai.Client(api_key=api_key)
 
-MODEL = os.getenv("GENAI_MODEL", "gemini-3.6-flash")
+MODEL = GEMINI_MODEL
 
 # --------------------------------------------------
 # 3. File locations
