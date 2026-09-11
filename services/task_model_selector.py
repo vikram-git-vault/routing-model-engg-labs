@@ -1,13 +1,16 @@
+from config import GEMINI_MODEL_SMALL, GEMINI_MODEL_LARGE
+
+
 MODEL_CONFIG = {
 
     "small": {
         "provider": "gemini",
-        "model": "gemini-3.5-flash-lite"
+        "model": GEMINI_MODEL_SMALL
     },
 
     "large": {
         "provider": "gemini",
-        "model": "gemini-3.5-flash-lite"
+        "model": GEMINI_MODEL_LARGE
     }
 }
 
