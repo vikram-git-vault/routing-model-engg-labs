@@ -1,35 +1,52 @@
+import logging
 import warnings
 
 
-def suppress_langchain_google_warnings():
-    """Suppress the noisy Google/LangChain SDK warnings that are not actionable in lab usage.
+# Loggers that emit unactionable noise during lab runs.
+#
+# The AFC notice ("Direct use of automatic function calling ... is not
+# recommended") is emitted through `logging`, NOT `warnings`, so
+# warnings.filterwarnings cannot suppress it no matter how it is matched.
+# It has to be silenced at the logger.
+NOISY_LOGGERS = (
+    "google_genai.models",
+    "google_genai.types",
+)
 
-    This is intentionally narrow: it ignores only the known warning emissions from
-    Google and LangChain libraries, while leaving other warnings visible.
+
+def suppress_langchain_google_warnings():
+    """Quieten known-noisy Google/LangChain SDK output.
+
+    Deliberately narrow on two axes:
+
+    - Only UserWarning is filtered, not the Warning base class. Filtering
+      Warning would also hide DeprecationWarning, which matters here: the
+      fork-based timeout in tiered_task_executor relies on behaviour Python
+      3.14 is actively deprecating, and that notice should stay visible.
+    - Only the loggers listed above are raised to ERROR, so genuine errors
+      from those modules still surface.
     """
 
-    warnings.filterwarnings(
-        "ignore",
-        category=Warning,
-        module=r"langchain_google_genai.*",
-    )
-    warnings.filterwarnings(
-        "ignore",
-        category=Warning,
-        module=r"langchain_anthropic.*",
-    )
-    warnings.filterwarnings(
-        "ignore",
-        category=Warning,
-        module=r"google.*",
-    )
-    warnings.filterwarnings(
-        "ignore",
-        category=Warning,
-        message=r".*Direct use of automatic function calling.*",
-    )
-    warnings.filterwarnings(
-        "ignore",
-        category=Warning,
-        message=r".*uses fixed sampling defaults.*",
-    )
+    for module in (
+        r"langchain_google_genai.*",
+        r"langchain_anthropic.*",
+        r"google.*",
+    ):
+        warnings.filterwarnings(
+            "ignore",
+            category=UserWarning,
+            module=module,
+        )
+
+    for message in (
+        r".*Direct use of automatic function calling.*",
+        r".*uses fixed sampling defaults.*",
+    ):
+        warnings.filterwarnings(
+            "ignore",
+            category=UserWarning,
+            message=message,
+        )
+
+    for logger_name in NOISY_LOGGERS:
+        logging.getLogger(logger_name).setLevel(logging.ERROR)
