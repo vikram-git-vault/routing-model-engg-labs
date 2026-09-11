@@ -1,5 +1,4 @@
-from pathlib import Path
-
+from config import SOURCE_TEXT_FILE
 from services.content_generation_pipeline import (
     run_content_pipeline,
 )
@@ -8,9 +7,7 @@ from services.token_metrics import format_token_metrics
 
 def main():
 
-    text = Path(
-        "long_text.txt"
-    ).read_text(
+    text = SOURCE_TEXT_FILE.read_text(
         encoding="utf-8"
     )
 

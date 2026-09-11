@@ -1,5 +1,4 @@
-from pathlib import Path
-
+from config import SOURCE_TEXT_FILE
 from services.structured_output_service import (
     generate_structured_response
 )
@@ -11,7 +10,7 @@ def main():
     # Load input text
     # ----------------------------------------------
 
-    text_file = Path("long_text.txt")
+    text_file = SOURCE_TEXT_FILE
 
     text = text_file.read_text(
         encoding="utf-8"

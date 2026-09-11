@@ -1,7 +1,33 @@
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
-load_dotenv()
+
+# ==================================================
+# Paths
+# ==================================================
+# Every path is built from the folder this file lives in, so scripts work
+# regardless of the directory they are launched from. Bare relative paths
+# like Path("prompts") only resolve when the cwd happens to be the project
+# root, which is a silent trap.
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+PROMPT_DIR = PROJECT_ROOT / "prompts"
+DATA_DIR = PROJECT_ROOT
+EVAL_DIR = PROJECT_ROOT / "evaluation"
+
+SOURCE_TEXT_FILE = DATA_DIR / "long_text.txt"
+TEST_DATA_FILE = EVAL_DIR / "rewrite_test_cases.csv"
+REPORT_FILE = EVAL_DIR / "prompt_evaluation_report.csv"
+
+
+# ==================================================
+# Environment
+# ==================================================
+
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

@@ -3,7 +3,6 @@ import csv
 import random
 import sys
 import time
-from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
@@ -36,9 +35,7 @@ client = genai.Client(
     ),
 )
 
-PROMPT_DIR = Path("prompts")
-TEST_DATA_FILE = Path("evaluation/rewrite_test_cases.csv")
-REPORT_FILE = Path("evaluation/prompt_evaluation_report.csv")
+from config import PROMPT_DIR, TEST_DATA_FILE, REPORT_FILE  # noqa: E402
 SAMPLE_SIZE = 5
 
 

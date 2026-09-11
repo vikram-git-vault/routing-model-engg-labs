@@ -2,7 +2,6 @@ import json
 import os
 import re
 import sys
-from pathlib import Path
 
 from dotenv import load_dotenv
 from google import genai
@@ -34,8 +33,7 @@ MODEL = os.getenv("GENAI_MODEL", "gemini-3.6-flash")
 # 3. File locations
 # --------------------------------------------------
 
-PROMPT_DIR = Path("prompts")
-TEXT_FILE = Path("long_text.txt")
+from config import PROMPT_DIR, SOURCE_TEXT_FILE as TEXT_FILE  # noqa: E402
 
 
 # --------------------------------------------------
