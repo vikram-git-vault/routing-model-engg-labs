@@ -1,13 +1,41 @@
-from config import GEMINI_API_KEY, ANTHROPIC_API_KEY
+from config import (
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
+)
 from services.prompt_loader import load_prompt
 
 
-def _resolve_provider(provider: str) -> str:
+# Model to use when a task is redirected to the other provider. The
+# configured model name belongs to the original provider, so it cannot
+# travel with the fallback.
+FALLBACK_MODELS = {
+    "gemini": GEMINI_MODEL,
+    "anthropic": ANTHROPIC_MODEL,
+}
+
+
+def _resolve_provider(provider: str, model: str):
+    """Fall back to the other provider when the configured one has no key.
+
+    Returns (provider, model). The model changes with the provider - routing
+    a Gemini model name to Anthropic would fail at the API.
+    """
+
+    if not GEMINI_API_KEY and not ANTHROPIC_API_KEY:
+        raise ValueError(
+            "No provider key is configured. Set GEMINI_API_KEY or "
+            "ANTHROPIC_API_KEY in .env before routing a task."
+        )
+
     if provider == "anthropic" and not ANTHROPIC_API_KEY:
-        return "gemini"
+        return "gemini", FALLBACK_MODELS["gemini"]
+
     if provider == "gemini" and not GEMINI_API_KEY:
-        return "anthropic"
-    return provider
+        return "anthropic", FALLBACK_MODELS["anthropic"]
+
+    return provider, model
 
 
 TASK_CONFIG = {
@@ -54,10 +82,15 @@ def route_task(task: str):
         config["prompt"]
     )
 
+    provider, model = _resolve_provider(
+        config["provider"],
+        config["model"]
+    )
+
     return {
         "task": task,
         "prompt_name": config["prompt"],
         "prompt": prompt,
-        "provider": config["provider"],
-        "model": config["model"]
+        "provider": provider,
+        "model": model
     }

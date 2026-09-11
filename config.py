@@ -8,6 +8,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GENAI_MODEL", "gemini-3.6-flash")
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+ANTHROPIC_MODEL = os.getenv(
+    "ANTHROPIC_MODEL",
+    "claude-haiku-4-5"
+)
 
 LLM_TEMPERATURE = float(
     os.getenv("LLM_TEMPERATURE", "0.1")
