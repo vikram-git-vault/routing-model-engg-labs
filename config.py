@@ -59,3 +59,42 @@ GEMINI_MODEL_LARGE = os.getenv(
     "GENAI_MODEL_LARGE",
     "gemini-3.6-flash"
 )
+
+
+# Native google-genai client HTTP timeout.
+#
+# NOTE the unit difference: google.genai HttpOptions takes MILLISECONDS,
+# while the LangChain chat models take SECONDS (see
+# services/provider_model_factory.REQUEST_TIMEOUT_SECONDS). Mixing them up
+# silently produces a deadline that never fires.
+GENAI_TIMEOUT_MS = int(
+    os.getenv("GENAI_TIMEOUT_MS", "30000")
+)
+
+
+def require_gemini_key() -> str:
+    """Return the Gemini key, or raise with a message that says what to do.
+
+    Raises rather than calling sys.exit so that importing a module never
+    kills the process. Entry points can catch this and exit cleanly.
+    """
+
+    if not GEMINI_API_KEY:
+        raise ValueError(
+            "GEMINI_API_KEY is not configured. "
+            "Copy .env.example to .env and set a real key."
+        )
+
+    return GEMINI_API_KEY
+
+
+def require_anthropic_key() -> str:
+    """Return the Anthropic key, or raise with a message that says what to do."""
+
+    if not ANTHROPIC_API_KEY:
+        raise ValueError(
+            "ANTHROPIC_API_KEY is not configured. Set a valid key or "
+            "route the task back to Gemini."
+        )
+
+    return ANTHROPIC_API_KEY
