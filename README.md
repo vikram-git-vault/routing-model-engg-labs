@@ -54,7 +54,8 @@ model — so tier routing spreads the budget as a side effect.
 
 ## Configuration
 
-Everything lives in `.env`, which is gitignored.
+Everything lives in `.env`, which is gitignored. **`config.py` is the single
+source** — no other module reads the environment.
 
 | Variable              | Purpose                                             |
 | --------------------- | --------------------------------------------------- |
@@ -63,11 +64,19 @@ Everything lives in `.env`, which is gitignored.
 | `GENAI_MODEL_SMALL`   | Model for the `small` tier. Must differ from large. |
 | `GENAI_MODEL_LARGE`   | Model for the `large` tier.                         |
 | `ANTHROPIC_API_KEY`   | Only needed if a task is routed to Anthropic.       |
+| `ANTHROPIC_MODEL`     | Model used when a task falls back to Anthropic.     |
 | `LLM_TEMPERATURE`     | Sampling temperature. Default `0.1`.                |
-| `LLM_TIMEOUT_SECONDS` | Per-attempt deadline in **seconds**. Minimum 10.    |
+| `LLM_TIMEOUT_SECONDS` | LangChain deadline in **seconds**. Floor of 10.     |
+| `GENAI_TIMEOUT_MS`    | Native client deadline in **milliseconds**.         |
 
-`config.py` is the intended single source for these. Some older modules still
-read the environment directly — see Known issues.
+`config.py` also owns every path (`PROJECT_ROOT`, `PROMPT_DIR`,
+`SOURCE_TEXT_FILE` and so on), derived from its own location, so scripts run
+correctly from any working directory.
+
+It exposes `require_gemini_key()` and `require_anthropic_key()`, which
+**raise** rather than calling `sys.exit`. Importing a module must never be
+able to terminate the process; entry points catch and exit on their own
+terms.
 
 ---
 
@@ -251,29 +260,45 @@ might return, optional where not all of them do.
 
 Honest list of what is still wrong.
 
-- **`_resolve_provider()` in `provider_aware_task_router.py` is never called.**
-  The provider-fallback logic the file is named for does not execute. All
-  four tasks are hardcoded to Gemini.
 - **`tiered_task_executor` uses `fork` multiprocessing.** It solves a real
-  problem, but forking a process holding gRPC threads risks deadlock on
-  macOS, and `fork` is being deprecated in Python 3.14. A thread with a
-  timeout would do the same job.
-- **429 handling is silent.** A quota error retries with backoff for minutes.
-  The API returns `retryDelay` in the response; the code should fail fast and
-  report it.
-- **`warning_policy.py` misses the AFC warning.** That message is emitted
-  through `logging`, not `warnings`, so `warnings.filterwarnings` cannot
-  catch it. It needs
-  `logging.getLogger("google_genai.models").setLevel(logging.ERROR)`.
-- **`config.py` is not used consistently.** Several modules still call
-  `load_dotenv()` and `os.getenv()` themselves.
-- **Import-time side effects.** `structured_output_service`,
-  `basic_task_executor` and `content_generation_pipeline` construct LLM
-  clients when imported. `content_generation_pipeline` raises if the key is
-  missing, so importing it can kill the process.
-- **Relative paths** in `grounded_content_analyzer.py`,
-  `model_routing_dashboard.py` and both demo scripts. They only run from the
-  project root, even though `prompt_loader` already solves this properly.
+  problem — capping total wall time including retry backoff, which a
+  per-request deadline cannot — but forking a process holding gRPC threads
+  risks deadlock on macOS, and `fork` is being deprecated in Python 3.14. A
+  thread with a timeout would do the same job. Replacing it needs live calls
+  to verify, so it is waiting on quota.
+- **429 handling is silent.** A quota error retries with backoff for
+  minutes. The API returns `retryDelay` in the response; the code should
+  fail fast and report it rather than appearing to hang.
 - **`max_output_tokens` varies** across files — 100, 120, 200, 400 — all
   hardcoded, none explained. 120 may truncate a rewrite.
+- **Three FastAPI apps share a title.** `basic_task_api`, `routed_task_api`
+  and `unified_task_api` all announce themselves as "Unified LLM Task API"
+  v1.0.0 on the same `POST /task` path.
+- **`models/task_request.py` duplicates `TaskRequest`** with a weaker
+  definition. Only the legacy API uses it.
 - **`prompts/summarize_v2.txt` is unused.**
+
+### Fixed since the initial commit
+
+Kept here because the reasoning is more useful than the fix.
+
+- **Timeout was in the wrong unit.** `20000` was read as 20,000 *seconds*,
+  so no deadline ever fired. Traced by the API's own error message naming
+  the deadline it received.
+- **Both model tiers pointed at the same model**, making the tiered router a
+  no-op. The selector also hardcoded its model instead of reading config, so
+  the tiered path silently used a different model from every other path.
+- **`response_model` silently dropped routing fields.** FastAPI filters
+  returned dicts against the schema, so `provider`, `model`, `model_tier`
+  and `timed_out` never reached the caller.
+- **`_resolve_provider()` was never called**, so the provider fallback the
+  router is named for did not run. Wiring it up surfaced two more problems:
+  the model name has to change with the provider, and falling back with no
+  keys at all had to become an error rather than a second dead end.
+- **The AFC notice could not be suppressed** by `warnings.filterwarnings` —
+  it is emitted through `logging`. The filters were also catching
+  `DeprecationWarning`, hiding the `fork` notice that applies to this repo.
+- **Relative paths** meant four entry points only ran from the project root.
+- **Import-time side effects.** Three services built LLM clients on import;
+  `content_generation_pipeline` raised on a missing key, so importing it
+  took down the UI at startup. All now build lazily behind `lru_cache`.
