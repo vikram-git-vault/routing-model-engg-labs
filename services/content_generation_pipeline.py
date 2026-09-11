@@ -5,6 +5,10 @@ from google import genai
 from config import GEMINI_MODEL, LLM_TEMPERATURE, require_gemini_key
 from services.prompt_loader import load_prompt
 from services.token_metrics import extract_token_metrics
+from services.warning_policy import suppress_langchain_google_warnings
+
+
+suppress_langchain_google_warnings()
 
 
 MAX_OUTPUT_TOKENS = 400

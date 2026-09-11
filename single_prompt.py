@@ -5,6 +5,10 @@ from google.genai import errors
 
 from config import GEMINI_MODEL, require_gemini_key
 from services.token_metrics import extract_token_metrics, format_token_metrics
+from services.warning_policy import suppress_langchain_google_warnings
+
+
+suppress_langchain_google_warnings()
 
 
 # require_gemini_key raises so that library callers are not killed by a

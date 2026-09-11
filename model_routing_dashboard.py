@@ -8,6 +8,10 @@ from google.genai import errors
 
 from config import GEMINI_MODEL, GENAI_TIMEOUT_MS, require_gemini_key
 from services.token_metrics import extract_token_metrics, format_token_metrics
+from services.warning_policy import suppress_langchain_google_warnings
+
+
+suppress_langchain_google_warnings()
 
 
 # ============================================================
