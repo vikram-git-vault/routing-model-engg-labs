@@ -5,8 +5,13 @@ from services.llm_task_executor import execute_task
 
 
 app = FastAPI(
-    title="Unified LLM Task API",
-    version="1.0.0"
+    title="Provider-Aware Task API",
+    version="1.0.0",
+    description=(
+        "Prompt routing plus provider and model selection per task, via "
+        "provider_aware_task_router. Falls back to the other provider when "
+        "a key is missing. Also returns provider and model."
+    ),
 )
 
 

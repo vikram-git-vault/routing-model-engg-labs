@@ -5,8 +5,14 @@ from services.tiered_task_executor import execute_task
 
 
 app = FastAPI(
-    title="Unified LLM Task API",
-    version="1.0.0"
+    title="Tiered Task API",
+    version="1.0.0",
+    description=(
+        "Prompt routing plus tier-based model selection, via "
+        "tiered_model_router. Small tasks take the cheap model, rewrite "
+        "takes the larger one. Adds a wall-clock timeout; returns "
+        "model_tier and timed_out alongside provider and model."
+    ),
 )
 
 

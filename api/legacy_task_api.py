@@ -5,8 +5,12 @@ from basic_task_router import route_task
 
 
 app = FastAPI(
-    title="LLM Task Router",
-    version="1.0.0"
+    title="Legacy Task Router",
+    version="1.0.0",
+    description=(
+        "The earliest version: returns the routing decision without "
+        "calling a model. Useful for inspecting a router in isolation."
+    ),
 )
 
 

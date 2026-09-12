@@ -5,8 +5,13 @@ from services.basic_task_executor import execute_task
 
 
 app = FastAPI(
-    title="Unified LLM Task API",
-    version="1.0.0"
+    title="Basic Task API",
+    version="1.0.0",
+    description=(
+        "Prompt routing only. prompt_based_router picks a template per "
+        "task; every task runs on the same Gemini model. Returns task, "
+        "result and token metrics."
+    ),
 )
 
 

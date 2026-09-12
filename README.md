@@ -127,12 +127,13 @@ pipeline, and the structured-output service. One request per click.
 ### The task APIs
 
 Three FastAPI apps, all serving `POST /task`, each wired to a different
-executor:
+executor. Each has its own title and description, so `/docs` tells you
+which one you are looking at:
 
 ```bash
-uvicorn api.basic_task_api:app --reload      # prompt routing only
-uvicorn api.routed_task_api:app --reload     # + provider and model
-uvicorn api.unified_task_api:app --reload    # + tier and timeout
+uvicorn api.basic_task_api:app --reload      # "Basic Task API"          - prompt routing only
+uvicorn api.routed_task_api:app --reload     # "Provider-Aware Task API" - + provider and model
+uvicorn api.unified_task_api:app --reload    # "Tiered Task API"         - + tier and timeout
 ```
 
 ```bash
@@ -260,20 +261,22 @@ might return, optional where not all of them do.
 
 Honest list of what is still wrong.
 
-- **`tiered_task_executor` uses `fork` multiprocessing.** It solves a real
-  problem — capping total wall time including retry backoff, which a
-  per-request deadline cannot — but forking a process holding gRPC threads
-  risks deadlock on macOS, and `fork` is being deprecated in Python 3.14. A
-  thread with a timeout would do the same job. Replacing it needs live calls
-  to verify, so it is waiting on quota.
+- **One call took 160 seconds and nothing explains it.** The transport
+  deadline was 20s and did not fire; retries were disabled and, per the
+  SDK source, genuinely do not run when `max_retries=1`. The wall-clock
+  timeout in `tiered_task_executor` currently covers for this rather than
+  fixing it — it is a seatbelt, not a solution. Diagnosing it needs one
+  live call with SDK debug logging.
+- **A timed-out request keeps running.** A thread cannot be killed, so
+  `shutdown(wait=False)` stops the caller waiting but the request continues
+  in the background and still consumes quota. The previous `fork` version
+  could terminate the work, but crashed Python on macOS when triggered from
+  the UI.
 - **429 handling is silent.** A quota error retries with backoff for
   minutes. The API returns `retryDelay` in the response; the code should
   fail fast and report it rather than appearing to hang.
 - **`max_output_tokens` varies** across files — 100, 120, 200, 400 — all
   hardcoded, none explained. 120 may truncate a rewrite.
-- **Three FastAPI apps share a title.** `basic_task_api`, `routed_task_api`
-  and `unified_task_api` all announce themselves as "Unified LLM Task API"
-  v1.0.0 on the same `POST /task` path.
 - **`models/task_request.py` duplicates `TaskRequest`** with a weaker
   definition. Only the legacy API uses it.
 - **`prompts/summarize_v2.txt` is unused.**
@@ -302,3 +305,10 @@ Kept here because the reasoning is more useful than the fix.
 - **Import-time side effects.** Three services built LLM clients on import;
   `content_generation_pipeline` raised on a missing key, so importing it
   took down the UI at startup. All now build lazily behind `lru_cache`.
+- **`fork` crashed Python on macOS** when a request came from the UI —
+  uvicorn is threaded and the Google SDK holds gRPC threads, which is
+  unsafe to fork from. Replaced with a `ThreadPoolExecutor`, deliberately
+  without a context manager: `Executor.__exit__` calls `shutdown(wait=True)`,
+  so returning on timeout from inside `with` still blocked for the full call.
+- **Three APIs announced the same title.** `/docs` gave no way to tell which
+  app was running. Each now has its own title and description.
