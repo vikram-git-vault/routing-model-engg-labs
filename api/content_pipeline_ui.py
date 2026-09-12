@@ -91,12 +91,26 @@ HTML_PAGE = """
         display: grid;
         grid-template-columns: 1.2fr 0.9fr 180px;
         gap: 12px;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
+        /* Every column is now label + control of the same height, so the
+           selects and the button sit on one baseline. */
         align-items: end;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
       }
 
       select, textarea, button {
         font: inherit;
+      }
+
+      label {
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: var(--text);
       }
 
       select, textarea {
@@ -106,6 +120,14 @@ HTML_PAGE = """
         padding: 12px 14px;
         background: #fff;
         color: var(--text);
+      }
+
+      /* Same fixed height as the button, so select and button share a
+         baseline. box-sizing is border-box, so this includes padding. */
+      select {
+        height: 48px;
+        padding-top: 0;
+        padding-bottom: 0;
       }
 
       textarea {
@@ -143,6 +165,19 @@ HTML_PAGE = """
         min-height: 26px;
         color: var(--muted);
         margin: 10px 0 18px;
+        font-weight: 600;
+      }
+
+      .status.loading {
+        color: var(--warning);
+      }
+
+      .status.error {
+        color: #b42318;
+      }
+
+      .status.success {
+        color: var(--success);
       }
 
       .results {
@@ -187,6 +222,10 @@ HTML_PAGE = """
       }
 
       .metrics-box {
+        /* .value-box sets white-space: pre-wrap so model output keeps its
+           line breaks. This box is generated HTML, not model text, so the
+           template's own indentation would render as blank lines. */
+        white-space: normal;
         margin-top: 12px;
         padding: 6px 10px 4px;
         border: 1px solid #dfe7ff;
@@ -251,7 +290,7 @@ HTML_PAGE = """
         <p class="subtitle">Run the repository's service modules individually and compare output plus usage.</p>
 
         <div class="controls">
-          <div>
+          <div class="field">
             <label for="moduleSelect">Module</label>
             <select id="moduleSelect">
               <option value="content_pipeline">Content pipeline</option>
@@ -260,10 +299,9 @@ HTML_PAGE = """
               <option value="provider_task">Provider-aware task executor</option>
               <option value="tiered_task">Tiered task executor</option>
             </select>
-            <div id="moduleDescription" class="helper-box"></div>
           </div>
 
-          <div>
+          <div class="field">
             <label for="taskSelect">Task</label>
             <select id="taskSelect">
               <option value="summarize">summarize</option>
@@ -275,6 +313,8 @@ HTML_PAGE = """
 
           <button class="primary" id="runButton">Run demo</button>
         </div>
+
+        <div id="moduleDescription" class="helper-box"></div>
 
         <div style="margin: 14px 0 8px;">
           <label for="inputText" style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text);">Input text for the selected module</label>
@@ -346,12 +386,15 @@ HTML_PAGE = """
           ? metrics
           : { input_tokens: 0, output_tokens: 0, total_tokens: 0 };
 
-        return `
-          <span class="metrics-title">token usage</span>
-          <div class="token-row"><span>input:</span><strong>${safeMetrics.input_tokens ?? 0}</strong></div>
-          <div class="token-row"><span>output:</span><strong>${safeMetrics.output_tokens ?? 0}</strong></div>
-          <div class="token-row"><span>total:</span><strong>${safeMetrics.total_tokens ?? 0}</strong></div>
-        `;
+        const row = (label, value) =>
+          `<div class="token-row"><span>${label}:</span><strong>${value ?? 0}</strong></div>`;
+
+        return [
+          '<span class="metrics-title">token usage</span>',
+          row('input', safeMetrics.input_tokens),
+          row('output', safeMetrics.output_tokens),
+          row('total', safeMetrics.total_tokens),
+        ].join('');
       }
 
       function renderResult(payload) {
@@ -388,6 +431,14 @@ HTML_PAGE = """
         resultsPanel.style.display = 'block';
       }
 
+      function setStatus(message, type = '') {
+        status.textContent = message;
+        status.classList.remove('loading', 'error', 'success');
+        if (type) {
+          status.classList.add(type);
+        }
+      }
+
       moduleSelect.addEventListener('change', updateTaskVisibility);
       updateTaskVisibility();
 
@@ -397,18 +448,25 @@ HTML_PAGE = """
         const task = taskSelect.value;
 
         if (!text) {
-          status.textContent = 'Please enter some text before running the demo.';
+          setStatus('Please enter some text before running the demo.', 'error');
           return;
         }
 
-        status.textContent = 'Running selected demo...';
+        const controller = new AbortController();
+        const timeoutMs = 60000;
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        setStatus('Waiting for response from the selected model…', 'loading');
         runButton.disabled = true;
+        runButton.textContent = 'Waiting…';
+        resultsPanel.style.display = 'none';
 
         try {
           const response = await fetch('/api/demo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ module, task, text })
+            body: JSON.stringify({ module, task, text }),
+            signal: controller.signal,
           });
 
           if (!response.ok) {
@@ -418,12 +476,18 @@ HTML_PAGE = """
 
           const data = await response.json();
           renderResult(data);
-          status.textContent = `Completed: ${module}`;
+          setStatus(`Completed: ${module}`, 'success');
         } catch (error) {
-          status.textContent = `Error: ${error.message}`;
+          if (error.name === 'AbortError') {
+            setStatus('Request timed out after 60 seconds. The model may be slow or unavailable.', 'error');
+          } else {
+            setStatus(`Error: ${error.message}`, 'error');
+          }
           resultsPanel.style.display = 'none';
         } finally {
+          clearTimeout(timeoutId);
           runButton.disabled = false;
+          runButton.textContent = 'Run demo';
         }
       });
     </script>
